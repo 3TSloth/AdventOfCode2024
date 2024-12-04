@@ -1,20 +1,29 @@
-use std::collections::VecDeque;
 use std::fs::File;
 use std::io;
-use std::io::prelude::*;
+use std::io::BufRead;
 use std::io::BufReader;
 
 fn main() {
-    println!("Hello, world!");
-    take_stdin();
+    println!("Starting program.");
+    // let mut reader_handle = take_stdin();
+    question1();
+
     println!("Finished program.");
 }
 
-fn take_stdin() -> io::Result<()> {
-    let file = File::open("input.txt")?;
+fn take_stdin() -> BufReader<File> {
+    let mut filename = String::new();
+    io::stdin().read_line(&mut filename).unwrap();
 
-    let mut reader = BufReader::new(file);
-    let mut buffer = String::new();
+    let file: File = File::open(filename.trim()).unwrap();
+    let reader = BufReader::new(file);
+
+    reader
+}
+
+fn question1() -> io::Result<()> {
+    println!("Enter the filename for question1's input:");
+    let reader = take_stdin();
 
     let mut left_side_ints: Vec<i32> = Vec::new();
     let mut right_side_ints: Vec<i32> = Vec::new();
@@ -53,7 +62,23 @@ fn take_stdin() -> io::Result<()> {
 
     let total_distance: i32 = distances.iter().sum();
 
-    println!("The total distance is {}", total_distance);
+    println!("Answer for quesiton 1 is: {}", total_distance);
 
     Ok(())
+}
+
+fn question2() {
+    let reader = take_stdin();
+
+    let levels: Vec<Vec<i32>> = Vec::new();
+
+    for line in reader.lines() {
+        //Convert to array of numbers
+        let line_unwrapped = line.unwrap();
+        let line_split: Vec<&str> = line_unwrapped
+            .split(' ')
+            .map(|num| num.parse::<i32>().unwrap());
+
+        println("Line split is {?:}", line_split);
+    }
 }
