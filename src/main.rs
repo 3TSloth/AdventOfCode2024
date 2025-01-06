@@ -6,6 +6,8 @@ use std::hash::Hash;
 use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::num::NonZeroIsize;
+use std::path::absolute;
 use std::thread::current;
 
 fn main() {
@@ -78,14 +80,14 @@ fn question1() -> io::Result<()> {
 fn question2() {
     let reader = take_stdin();
 
-    let mut reports: Vec<Vec<i32>> = Vec::new();
+    let mut reports: Vec<Vec<isize>> = Vec::new();
 
     for line in reader.lines() {
         //Convert to array of numbers
-        let line_unwrapped = line.unwrap();
-        let line_split: Vec<i32> = line_unwrapped
+        let line_unwrapped: String = line.unwrap();
+        let line_split: Vec<isize> = line_unwrapped
             .split(' ')
-            .map(|num| num.parse::<i32>().unwrap())
+            .map(|num| num.parse::<isize>().unwrap())
             .collect();
 
         reports.push(line_split);
@@ -97,111 +99,111 @@ fn question2() {
     println!("Finished question 2");
 }
 
-fn scan_list(reports: &mut Vec<Vec<i32>>) -> usize {
-    //let hashset_list: Vec<HashSet<i32>> = Vec::new();
+fn scan_list(reports: &mut Vec<Vec<isize>>) -> isize {
     let mut num_safe_reports = 0;
 
     for report in reports {
-        scan_report(report, &mut num_safe_reports, false);
+        num_safe_reports += scan_report(&report);
     }
 
     num_safe_reports
 }
 
-pub fn scan_report(report: &Vec<i32>, num_safe: &mut usize, is_recursing: bool) {
-    println!("Report is: {:?}", report);
-    let mut differences: Vec<i32> = Vec::new();
+fn create_differences_list(report: &Vec<isize>) -> Vec<isize> {
+    let mut differences = Vec::new();
     let report_length = report.len();
-    let mut indices_of_bad_levels = Vec::new();
 
-    if report_length > 2 {
-        let mut previous_num = report.get(0).unwrap();
-        let mut next_num = report.get(1).unwrap();
+    let mut index = 0;
 
-        let mut index = 0;
+    while index < report_length - 1 {
+        let diff = *report.get(index).unwrap() - *report.get(index + 1).unwrap();
 
-        while index < report_length - 1 {
-            let difference = previous_num - next_num;
-            let abs_difference = difference.abs();
-            let is_within_limits = abs_difference >= 1 && abs_difference <= 3;
-
-            println!("The difference is: {}", difference);
-
-            //If it's not within limits, add it to the list of levels to be removed
-            if !is_within_limits && !is_recursing {
-                indices_of_bad_levels.push(index);
-            }
-
-            differences.push(difference);
-            index += 1;
-
-            previous_num = report.get(index).unwrap();
-
-            if index + 1 < report_length - 1 {
-                next_num = report.get(index + 1).unwrap();
-            }
-        }
-
-        let mut num_positive = 0;
-        let mut num_negative = 0;
-
-        for difference in differences {
-            if difference >= 1 {
-                num_positive += 1;
-            } else {
-                num_negative += 1;
-            }
-        }
-
-        println!("Num positive is: {}", num_positive);
-        println!("Num negative is : {}", num_negative);
-        println!("Report length is: {}", report_length);
-
-        let is_safe = num_positive == report_length - 1 || num_negative == report_length - 1;
-
-        println!("Num safe is: {}", num_safe);
-        if is_safe {
-            *num_safe += 1;
-        }
-
-        if is_recursing {
-            println!("Num_safe within recursing is: {}", num_safe);
-            return;
-        }
-
-        println!("Gets here");
-
-        println!("Indices of bad levels is {:?}", indices_of_bad_levels);
-        //If it's not safe and there's 'bad levels' to remove (which should be at least one), attempt again
-        if !is_safe && indices_of_bad_levels.len() >= 1 {
-            //Remove each bad level from the original and see if it's safe
-            for bad_level_index in indices_of_bad_levels {
-                let mut report_copy = report.clone();
-                report_copy.remove(bad_level_index);
-
-                println!("New report to be recursed on: {:?}", report_copy);
-
-                println!("Num safe before rcursing {}", num_safe);
-                scan_report(&report_copy, num_safe, true);
-                println!("Num safe after recursing {}", num_safe);
-            }
-        }
-    } else if report_length == 2 {
-        println!("Gets in report_length 2 if");
-        let first_num = report.get(0).unwrap();
-        let second_num = report.get(1).unwrap();
-        let is_safe = first_num < second_num || first_num > second_num;
-
-        println!("Within recursion, is safe is {}", is_safe);
-
-        if is_safe {
-            *num_safe += 1;
-            println!("Gets inside is safe report length 2");
-            println!("Num safe should now be: {}", num_safe);
-        }
-    } else if report_length == 1 {
-        *num_safe += 1;
+        differences.push(diff);
+        index += 1;
     }
+
+    differences
+}
+
+fn scan_report(report: &Vec<isize>) -> isize {
+    let report_length = report.len();
+    let differences = create_differences_list(report);
+
+    let increasing_or_decreasing = is_increasing_or_decreasing(&differences);
+    let within_range = is_within_range(&differences);
+
+    //If both of these are true, then the report is safe
+    if within_range && increasing_or_decreasing {
+        return 1;
+    }
+
+    let mut index = 0;
+
+    //If it fails for either reason, let's just try it again by removing every level until
+    //we run out of levels or find one that works. Note this is very brute force as we're
+    //re-copying the original every iteration of the loop
+
+    while index < report_length {
+        let mut report_copy = report.clone();
+        println!("Report_copy is {:?}", report_copy);
+        report_copy.remove(index);
+        println!("Report_copy after removing one is {:?}", report_copy);
+
+        let new_differences = create_differences_list(&report_copy);
+        println!("New differences is :{:?}", new_differences);
+        if is_within_range(&new_differences) && is_increasing_or_decreasing(&new_differences) {
+            return 1;
+        }
+
+        index += 1;
+    }
+
+    //If it gets here, then it means the report isn't safe so return 0
+    return 0;
+}
+
+fn is_within_range(differences: &Vec<isize>) -> bool {
+    if differences.len() == 0 {
+        return false;
+    } else if differences.len() == 1 {
+        let abs_difference = differences.get(0).unwrap().abs();
+        if abs_difference > 0 && abs_difference <= 3 {
+            return true;
+        }
+        return false;
+    }
+
+    for difference in differences {
+        let abs_difference = difference.abs();
+        if !(abs_difference > 0 && abs_difference <= 3) {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn is_increasing_or_decreasing(differences: &Vec<isize>) -> bool {
+    let mut index = 0;
+    let differences_length = differences.len();
+
+    if differences_length == 0 {
+        return false;
+    } else if differences_length == 1 {
+        return true;
+    }
+
+    while index < differences_length - 1 {
+        let current_diff = *differences.get(index).unwrap();
+        let next_diff = *differences.get(index + 1).unwrap();
+
+        if current_diff.signum() != next_diff.signum() {
+            return false;
+        }
+        index += 1;
+    }
+
+    println!("Differences are : {:?}", differences);
+    return true;
 }
 
 #[cfg(test)]
@@ -212,65 +214,56 @@ mod tests {
     #[test]
     fn scan_report_increasing() {
         let increasing_report = vec![1, 2, 3, 4, 5, 6];
-        let num_safe_reports = 0;
 
-        assert_eq!(
-            1,
-            scan_report(&increasing_report, &mut num_safe_reports, false)
-        );
+        assert_eq!(1, scan_report(&increasing_report));
     }
 
     #[test]
     fn scan_report_one_bad_level_increasing() {
         let increasing_report = vec![1, 2, 3, 10, 6];
-        let max_tolerance = 1;
 
-        assert_eq!(true, scan_report(&increasing_report,));
+        assert_eq!(1, scan_report(&increasing_report,));
     }
 
     #[test]
     fn scan_report_decreasing() {
         let decreasing_report = vec![6, 5, 4, 3, 2, 1];
-        let max_tolerance = 0;
 
-        assert_eq!(true, scan_report(&decreasing_report));
+        assert_eq!(1, scan_report(&decreasing_report));
     }
 
     #[test]
     fn scan_report_increasing_and_decreasing() {
         let increasing_and_decreasing = vec![1, 2, 3, 4, 3, 2, 1];
-        let max_tolerance = 0;
 
-        assert_eq!(false, scan_report(&increasing_and_decreasing));
+        assert_eq!(0, scan_report(&increasing_and_decreasing));
     }
 
     #[test]
     fn scan_report_duplicate_increasing() {
         let report_with_two_bad_levels = vec![1, 2, 3, 7, 7, 4];
-        let max_tolerance = 1;
-        assert_eq!(false, scan_report(&report_with_two_bad_levels))
+
+        assert_eq!(0, scan_report(&report_with_two_bad_levels))
     }
 
     #[test]
     fn scan_report_duplicate_decreasing() {
         let report_with_two_bad_levels = vec![9, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1];
-        let max_tolerance = 1;
-        assert_eq!(false, scan_report(&report_with_two_bad_levels));
+
+        assert_eq!(0, scan_report(&report_with_two_bad_levels));
     }
 
     #[test]
     fn scan_report_outside_range_increasing() {
-        let report_with_outside_range = vec![1, 10, 12];
-        let max_tolerance = 0;
+        let report_with_outside_range = vec![1, 10, 20];
 
-        assert_eq!(false, scan_report(&report_with_outside_range));
+        assert_eq!(0, scan_report(&report_with_outside_range));
     }
 
     #[test]
     fn scan_report_outside_range_increasing_within_one_level() {
         let report_with_outside_range = vec![1, 10, 12];
-        let max_tolerance = 1;
 
-        assert_eq!(true, scan_report(&report_with_outside_range));
+        assert_eq!(1, scan_report(&report_with_outside_range));
     }
 }
